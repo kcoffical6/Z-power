@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ZEE Links (Cards open on click)</title>
+  <style>
+    :root { color-scheme: light dark; --bg:#0f172a; --card:#111827; --fg:#e5e7eb; --muted:#9ca3af; --info:#60a5fa;}
+    @media (prefers-color-scheme: light){ :root{ --bg:#f8fafc; --card:#ffffff; --fg:#0f172a; --muted:#475569; } }
+    body{ margin:0; font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; background:var(--bg); color:var(--fg);}
+    .wrap{ max-width:720px; margin:0 auto; padding:16px;}
+    header{ padding:12px 14px; background:var(--card); border-radius:12px; box-shadow:0 1px 6px rgba(0,0,0,0.15);}
+    h1{ font-size:1.15rem; margin:0 0 6px 0;}
+    .time-row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap;}
+    .time-chip{ padding:8px 10px; border-radius:10px; background: rgba(96,165,250,0.15); font-size:.95rem; min-width:140px;}
+    .tz-select{ padding:8px 10px; border-radius:10px; border:1px solid rgba(148,163,184,0.4); background:transparent; color:var(--fg); font-size:.95rem;}
+    .list{ margin-top:16px; display:grid; gap:12px;}
+    .card{ display:block; text-decoration:none; color:inherit; background:var(--card); border-radius:12px; padding:12px; border:1px solid rgba(148,163,184,0.15); transition: transform .08s ease, box-shadow .08s ease; }
+    .card:hover{ transform: translateY(-1px); box-shadow:0 4px 16px rgba(0,0,0,.25); }
+    .title{ font-weight:600; font-size:1rem; margin:0 0 4px 0;}
+    .telecast{ font-size:.92rem; margin:4px 0 0 0;}
+    .countdown{ font-size:.85rem; color:var(--info); margin-top:4px;}
+    footer{ margin:22px 0 8px; text-align:center; color:var(--muted); font-size:.85rem;}
+    .badge{ display:inline-block; font-size:.75rem; padding:4px 8px; border-radius:999px; background:rgba(34,197,94,0.15); margin-left:6px; vertical-align:middle;}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>ZEE links opener <span class="badge">mobile-friendly</span></h1>
+      <div class="time-row">
+        <div class="time-chip" id="localTime">Local: --</div>
+        <div class="time-chip" id="istTime">IST: --</div>
+        <select class="tz-select" id="displayTz">
+          <option value="local">Show Local & IST</option>
+          <option value="IST">Show IST only</option>
+        </select>
+      </div>
+    </header>
+
+    <section class="list" id="linksList"></section>
+
+    <footer>Tap any card to open in a new tab.</footer>
+  </div>
+
+  <script>
+    // Cards: title + telecast + countdown (no raw URL text, no agree box)
+    const items = [
+      {
+        title: "Bhavishya Darshana (TV Serial)",
+        url: "https://www.zee5.com/tv-shows/details/bhavishya-darshana/0-6-4z5808792",
+        telecastText: "ಬೆಳಿಗ್ಗೆ 7:30 AM (IST)",
+        dailyIstTime: "07:30"
+      },
+      {
+        title: "Rajakumari (Web Series)",
+        url: "https://www.zee5.com/web-series/details/rajakumari/0-6-4z5808951",
+        telecastText: "ಸಂಜೆ 7:00 PM (IST)",
+        dailyIstTime: "19:00"
+      },
+      {
+        title: "Gowri (TV Serial)",
+        url: "https://www.zee5.com/tv-shows/details/gowri/0-6-4z5808898",
+        telecastText: "ರಾತ್ರಿ 7:30 PM (IST)",
+        dailyIstTime: "19:30"
+      },
+      {
+        title: "Jodi Hakki (TV Serial)",
+        url: "https://www.zee5.com/tv-shows/details/jodi-hakki/0-6-4z5808966",
+        telecastText: "ರಾತ್ರಿ 8:00 PM (IST)",
+        dailyIstTime: "20:00"
+      },
+      {
+        title: "Shubhasya Sheegram (TV Serial)",
+        url: "https://www.zee5.com/tv-shows/details/shubhasya-sheeghram/0-6-4z5808794",
+        telecastText: "ರಾತ್ರಿ 8:30 PM (IST)",
+        dailyIstTime: "20:30"
+      },
+      {
+        title: "Halli Power (Reality Show)",
+        url: "#", // replace with actual link if available
+        telecastText: "ರಾತ್ರಿ 9:00 PM (IST)",
+        dailyIstTime: "21:00"
+      }
+    ];
+
+    // DOM
+    const localEl = document.getElementById("localTime");
+    const istEl = document.getElementById("istTime");
+    const tzSelect = document.getElementById("displayTz");
+    const listEl = document.getElementById("linksList");
+
+    // Time helpers
+    function formatDateTime(dt, tz){
+      try {
+        return new Intl.DateTimeFormat(undefined,{
+          timeZone: tz,
+          year:"numeric", month:"short", day:"2-digit",
+          hour:"2-digit", minute:"2-digit", second:"2-digit", hour12:true
+        }).format(dt);
+      } catch { return dt.toLocaleString(); }
+    }
+    function istNowParts(){
+      const fmt = new Intl.DateTimeFormat('en-CA',{
+        timeZone:'Asia/Kolkata', hour12:false,
+        year:'numeric', month:'2-digit', day:'2-digit',
+        hour:'2-digit', minute:'2-digit', second:'2-digit'
+      });
+      const parts = fmt.formatToParts(new Date()).reduce((o,p)=> (o[p.type]=p.value, o), {});
+      return { y:+parts.year, m:+parts.month, d:+parts.day, hh:+parts.hour, mm:+parts.minute, ss:+parts.second };
+    }
+    function istDate(y,m,d,hh,mm,ss){
+      // Convert IST to UTC epoch (IST = UTC+5:30)
+      return new Date(Date.UTC(y, m-1, d, hh-5, mm-30, ss));
+    }
+    function timeUntilNextIst(hhmm){
+      if(!hhmm) return null;
+      const [HH,MM] = hhmm.split(":").map(Number);
+      const n = istNowParts();
+      const nowIstEpoch = istDate(n.y,n.m,n.d,n.hh,n.mm,n.ss).getTime();
+      let target = istDate(n.y,n.m,n.d,HH,MM,0).getTime();
+      if (target <= nowIstEpoch) target += 24*3600*1000;
+      const diff = target - nowIstEpoch;
+      const totalSec = Math.floor(diff/1000);
+      const hh = String(Math.floor(totalSec/3600)).padStart(2,'0');
+      const mm = String(Math.floor((totalSec%3600)/60)).padStart(2,'0');
+      const ss = String(totalSec%60).padStart(2,'0');
+      return `${hh}h ${mm}m ${ss}s`;
+    }
+
+    // Render
+    function renderCards(){
+      listEl.innerHTML = "";
+      items.forEach((item) => {
+        const a = document.createElement("a");
+        a.className = "card";
+        a.href = item.url;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+
+        const title = document.createElement("div");
+        title.className = "title";
+        title.textContent = item.title;
+
+        const tele = document.createElement("div");
+        tele.className = "telecast";
+        tele.textContent = `Telecast (IST): ${item.telecastText}`;
+
+        const cd = document.createElement("div");
+        cd.className = "countdown";
+        cd.dataset.time = item.dailyIstTime || "";
+        cd.textContent = item.dailyIstTime ? "Next telecast (IST): calculating..." : "";
+        cd.style.display = item.dailyIstTime ? "block" : "none";
+
+        a.appendChild(title);
+        a.appendChild(tele);
+        a.appendChild(cd);
+
+        listEl.appendChild(a);
+      });
+    }
+
+    function tick(){
+      const now = new Date();
+      localEl.textContent = "Local: " + formatDateTime(now);
+      istEl.textContent = "IST: " + formatDateTime(now, "Asia/Kolkata");
+      const mode = tzSelect.value;
+      localEl.style.display = (mode === "IST") ? "none" : "inline-block";
+
+      document.querySelectorAll(".countdown").forEach(el => {
+        const t = el.dataset.time;
+        if (!t) return;
+        const txt = timeUntilNextIst(t);
+        if (txt) el.textContent = `Next telecast in: ${txt} (IST: ${t})`;
+      });
+    }
+
+    renderCards();
+    tick();
+    setInterval(tick, 1000);
+  </script>
+</body>
+</html>
